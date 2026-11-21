@@ -64,7 +64,12 @@ mvn verify
 
 ## Automated PR check (GitHub Actions)
 
-`.github/workflows/pr-check.yml` runs on every pull request to `main`:
+`.github/workflows/pr-check.yml` runs on every pull request to `main` or `develop`.
+
+Branches:
+
+- `main` holds released code only. Change it through a pull request from `develop`.
+- `develop` is where code changes land. Create feature branches from `develop` and open pull requests into it.
 
 1. **Build, test and coverage:** `mvn clean verify` runs all JUnit tests and fails the build if line coverage drops below 80%. The JaCoCo report is uploaded as a build artifact. The JAR is then packaged.
 2. **Claude code review:** `anthropics/claude-code-action` reviews the diff for correctness, secret handling, plain HTTP and TLS, and missing tests, and posts inline comments.
