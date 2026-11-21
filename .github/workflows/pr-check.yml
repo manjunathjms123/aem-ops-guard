@@ -1,0 +1,69 @@
+name: PR check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-coverage:
+    name: Build, test and coverage gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # verify runs every JUnit test, writes the JaCoCo report,
+      # and fails the build if line coverage drops below 80%.
+      - name: Build, test and check coverage
+        run: mvn -B clean verify
+
+      - name: Build the runnable JAR
+        run: mvn -B -DskipTests package
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          if-no-files-found: warn
+
+  claude-review:
+    name: Claude code review
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Skip PRs from forks: secrets are not passed to them.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this pull request for an Adobe Experience Manager (AEM) Java 21 Maven CLI named aem-ops-guard.
+            Focus on:
+            - Correctness bugs and unhandled error paths in the HTTP client, config loading and checks.
+            - Secrets: passwords must never be printed, logged, or put in URLs, reports or snapshots.
+            - Plain HTTP and TLS: only LOCAL may use http:// unless ALLOW_HTTP is set; redirects must not leave the author host.
+            - Missing or weak tests for changed behaviour.
+            Post findings as inline comments with file and line references. Skip style-only remarks.
+          claude_args: |
+            --max-turns 20
